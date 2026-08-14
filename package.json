@@ -1,11 +1,12 @@
 {
   "name": "enterprise-agent-workbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A portfolio-grade reference architecture for reliable, tool-using enterprise AI agents.",
+  "description": "A portfolio-grade reference architecture for managing reliable, evaluated, tool-using AI agent fleets.",
   "scripts": {
     "dev": "tsx src/demo.ts",
+    "demo:commerce": "tsx src/commerce/demo.ts",
     "mcp": "tsx src/mcp/server.ts",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test tests/*.test.ts",
