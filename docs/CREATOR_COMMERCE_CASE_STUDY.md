@@ -4,7 +4,7 @@
 
 Creator-commerce teams do not need a generic chatbot. They need bounded agents that understand who they serve, perform a specific job, delegate intentionally, and improve from evidence produced by real runs.
 
-This case study extends Enterprise Agent Workbench with a small creator-commerce fleet and an **Agent Manager** responsible for quality, boundaries, delegation, drift, and improvement routing.
+This case study extends Enterprise Agent Workbench with a small creator-commerce fleet and an **Agent Manager** responsible for quality, boundaries, delegation, drift, improvement routing, version control, and regression coverage.
 
 ## Fleet
 
@@ -18,12 +18,54 @@ This case study extends Enterprise Agent Workbench with a small creator-commerce
 ## The gardening loop
 
 1. **Understand the task contract** — customer, objective, constraints, and expected evidence are explicit.
-2. **Run the bounded specialist** — the agent produces output, evidence, tool-call history, delegation, and boundary events.
-3. **Evaluate the run** — accuracy, usefulness, tone, evidence coverage, and boundary discipline are scored.
-4. **Diagnose the failure** — failures are classified as prompt, knowledge, tool, delegation, product ambiguity, or human escalation problems.
-5. **Route the improvement** — agent-side changes stay with the Agent Manager; capability gaps go to engineering; product ambiguity goes to product; unresolved decisions stay with human operations.
-6. **Add regression coverage** — fixes should become eval cases so solved failures do not silently return.
-7. **Watch for drift** — recent quality windows are compared with prior windows and a meaningful decline is surfaced.
+2. **Run a versioned specialist** — each run is associated with an explicit agent configuration version.
+3. **Persist the run history** — output, evidence, tool calls, delegation, boundary events, evaluation, and config version are stored together.
+4. **Evaluate the run** — accuracy, usefulness, tone, evidence coverage, and boundary discipline are scored.
+5. **Diagnose the failure** — failures are classified as prompt, knowledge, tool, delegation, product ambiguity, or human escalation problems.
+6. **Route the improvement** — agent-side changes stay with the Agent Manager; capability gaps go to engineering; product ambiguity goes to product; unresolved decisions stay with human operations.
+7. **Add regression coverage** — solved failures become reusable eval cases.
+8. **Compare versions before promotion** — candidate configs should clear regression cases before becoming active.
+9. **Watch for drift** — recent quality windows are compared with prior windows and a meaningful decline is surfaced.
+
+## Versioned agent configurations
+
+`src/commerce/config.ts` separates agent behavior from ad-hoc prompt edits. Each configuration has:
+
+- agent ID
+- semantic version
+- lifecycle status: `candidate`, `active`, or `retired`
+- explicit instructions
+- explicit boundaries
+- creation timestamp
+
+This makes behavioral changes reviewable. Instead of saying "we changed the prompt," the team can say "creator-brand-match 1.1.0 is a candidate intended to improve evidence grounding without changing outreach boundaries."
+
+A production promotion flow would be:
+
+**candidate config → offline regression suite → shadow/limited traffic → quality comparison → active config**
+
+## Run history
+
+`src/commerce/history.ts` defines a storage contract for the evidence produced by each run. The current implementation is in-memory for portability, but the interface is designed to be replaced by a durable store.
+
+Each stored entry ties together:
+
+- the original agent run
+- the resulting evaluation
+- the exact config version that produced it
+
+That link is important because quality drift is not actionable if the team cannot determine which behavior version caused it.
+
+## Regression evals
+
+`src/commerce/regression.ts` turns known failure modes into executable cases. The initial suite protects two behaviors:
+
+1. A brand campaign with an undefined budget must **escalate instead of inventing a commercial constraint**.
+2. Creator-brand matching with sufficient inputs must remain evidence-driven and avoid unnecessary product/human escalation.
+
+Each case defines an agent, representative task, minimum score, and failure classifications that must or must not appear. The suite records the active config version used for the test, making eval results version-aware.
+
+This creates a practical rule for agent gardening: **when a production failure is fixed, add a regression case before declaring it solved.**
 
 ## Why the routing matters
 
@@ -45,6 +87,8 @@ The current evaluator is deterministic so the behavior is inspectable and testab
 
 A brand asks for a creator campaign but provides no budget. The Brand Campaign Agent recognizes that the commercial constraint is missing, records a boundary event, and delegates to the Agent Manager rather than inventing a number. The evaluator classifies the run as product ambiguity plus human escalation. The improvement queue routes those issues to product and human operations instead of asking engineering to "make the model smarter."
 
+That failure is now represented in the regression suite, so a later prompt or configuration change that stops escalating will fail evaluation before promotion.
+
 ## What I would measure in production
 
 - task success rate by agent and workflow
@@ -55,10 +99,11 @@ A brand asks for a creator campaign but provides no budget. The Brand Campaign A
 - delegation success rate
 - tool failure rate
 - latency and cost per successful task
-- quality score by prompt/version
+- quality score by agent/config version
+- regression pass rate
 - repeated failure frequency
 - drift by agent, customer segment, and workflow
 
-## Next iteration
+## Next production iteration
 
-The next production step would persist run histories, add versioned prompt/agent configurations, introduce offline eval datasets from representative workflows, compare candidate versions before promotion, and connect the improvement queue to an issue or product-management system.
+The next step would replace the in-memory history store with durable persistence, add candidate-config registration and promotion controls, build larger offline datasets from representative customer workflows, introduce calibrated LLM-as-judge dimensions where deterministic checks are insufficient, and connect improvement items to an issue or product-management system.
