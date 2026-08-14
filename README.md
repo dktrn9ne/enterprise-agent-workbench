@@ -1,14 +1,14 @@
 # Enterprise Agent Workbench
 
-> A reference architecture for reliable, tool-using enterprise AI agents.
+> A reference architecture for managing reliable, tool-using AI agents against real customer workflows.
 
-**Portfolio project by Maurice Thomas** — built to demonstrate applied agent engineering: workflow discovery, MCP tooling, role-aware access, stateful execution, human approval gates, reusable skills, and instrumentation.
+**Portfolio project by Maurice Thomas** — built to demonstrate hands-on agent product management: workflow discovery, agent scope and boundaries, orchestration, tool use, evaluation, quality drift detection, improvement routing, human escalation, and instrumentation.
 
 ## Why this exists
 
-Enterprise AI becomes useful when models can operate inside real workflows — but usefulness without control is a liability.
+Production agents need more than good prompts. Someone has to own **what each agent is for**, understand the people it serves, inspect evidence from real runs, identify recurring gaps, and decide whether an improvement belongs in the prompt/context layer, engineering, product, or human operations.
 
-This project treats an AI agent as a **privileged software system** rather than an all-knowing chatbot. The architecture demonstrates how an agent can retrieve internal context, invoke tools, preserve state, stop at approval boundaries, and leave an inspectable audit trail.
+This workbench treats an agent as a **bounded product inside a larger system** rather than an all-knowing chatbot.
 
 The central question is not:
 
@@ -16,73 +16,68 @@ The central question is not:
 
 It is:
 
-> Can the system do this repeatedly, safely, observably, and with the right human in control?
+> Can we keep a fleet of agents useful, reliable, on-tone, well-delegated, and inside the boundaries where customers trust them?
+
+## Creator-commerce fleet
+
+The repo now includes a domain-specific example modeled around creator and brand workflows:
+
+| Agent | Job | Key boundary |
+| --- | --- | --- |
+| `creator_research` | Produce evidence-backed creator research | Never invent audience or performance claims |
+| `brand_campaign` | Turn brand goals into measurable campaign briefs | Never invent commercial terms or approve spend |
+| `creator_brand_match` | Rank and explain creator-brand fit | No protected-trait inference, unsupported claims, or automatic outreach |
+| `agent_manager` | Evaluate runs, detect drift, and route improvements | Never turn unresolved product ambiguity into silent autonomy |
+
+The **Agent Manager** scores run quality across accuracy, usefulness, tone, evidence coverage, and boundary discipline. Failures are classified and routed to the right owner:
+
+- prompt / knowledge / delegation → Agent Manager
+- missing tool or capability → Engineering
+- undefined customer or product rule → Product
+- unresolved consequential decision → Human Operations
+
+This is the core "agent gardening" loop: **run → evaluate → diagnose → route → improve → regression-test → watch for drift**.
+
+See [`docs/CREATOR_COMMERCE_CASE_STUDY.md`](docs/CREATOR_COMMERCE_CASE_STUDY.md).
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    U[Operator] --> A[Enterprise Agent]
-    A --> S[State Store]
-    A --> G[Policy Guard Sub-agent]
-    A --> R[Research Sub-agent]
-    A --> O[Orchestration Layer]
-    O --> T[Tool Registry]
-    T --> M[MCP Server]
-    T --> D[Internal Docs]
-    T --> P[People Directory]
-    T --> J[Task System]
-    T --> F[Financial / HR Writes]
-    F --> H{Human Approval}
-    H -->|Approved| X[Execute]
-    H -->|Denied| N[Stop]
-    T --> L[Audit + Instrumentation]
+    C[Brand / Creator / Internal Team] --> T[Task Contract]
+    T --> O[Agent Orchestration]
+    O --> CR[Creator Research]
+    O --> BC[Brand Campaign]
+    O --> CM[Creator-Brand Match]
+    CR --> R[Run History]
+    BC --> R
+    CM --> R
+    R --> AM[Agent Manager / Evaluator]
+    AM --> Q[Improvement Queue]
+    Q -->|Prompt / context / delegation| AM
+    Q -->|Tool gap| E[Engineering]
+    Q -->|Product ambiguity| P[Product]
+    Q -->|Decision boundary| H[Human Ops]
+    AM --> D[Drift + Regression Evals]
+
+    O --> G[Policy Guard]
+    O --> TR[Tool Registry / MCP]
+    TR --> A[Audit + Instrumentation]
 ```
 
 ## What it demonstrates
 
+- **Agent product ownership** through explicit customer, objective, constraints, evidence, and boundaries.
+- **Multi-agent orchestration** with specialized creator-commerce agents and intentional delegation.
+- **Run evaluation** across quality and boundary dimensions.
+- **Failure taxonomy** distinguishing prompt, knowledge, tool, delegation, product, and human-decision problems.
+- **Improvement queue routing** to Agent Manager, engineering, product, or human operations.
+- **Quality drift detection** across recent run windows.
 - **MCP server** exposing enterprise-style tools over stdio.
-- **Tool-using agent architecture** with a shared, validated tool registry.
-- **Stateful sessions** that preserve workflow context.
-- **Stateful sub-agent patterns** for research and policy review.
-- **Reusable agent skills** for repeatable business workflows.
-- **Least-privilege access** using role-based tool allowlists.
-- **Human approval gates** for consequential HR and financial writes.
-- **Schema validation** before tool execution.
-- **Audit instrumentation** across tool requests, blocks, approvals, and executions.
-- **Model-evaluation mindset** with explicit reliability metrics and failure cases.
-- **Deterministic local demo mode** that works without API keys.
+- **Least-privilege access** and human approval gates for consequential actions.
+- **Schema validation**, stateful sessions, audit instrumentation, and deterministic tests.
+- **Deterministic local demos** that work without model API keys.
 - **Optional Claude integration** via the Anthropic SDK.
-
-## Example workflow: reimbursement request
-
-A Finance user asks:
-
-```text
-Please issue my $650 travel reimbursement and tell me the policy.
-```
-
-The agent:
-
-1. Searches internal policy documentation.
-2. Identifies the reimbursement action as consequential.
-3. Checks the caller's role and tool permissions.
-4. Creates an approval boundary instead of silently executing.
-5. Records each tool request and policy decision in the audit trail.
-6. Reports that execution stopped pending approval.
-
-This is intentional: **reliable agents should know when not to act.**
-
-## Tool surface
-
-| Tool | Purpose | Risk | Approval |
-|---|---|---:|---:|
-| `search_docs` | Search internal policy/ops knowledge | Low | No |
-| `search_people` | Search mock employee directory | Low | No |
-| `create_task` | Create a project-management task | Low | No |
-| `draft_message` | Draft, but do not send, a message | Low | No |
-| `update_employee_record` | Modify employee information | High | Yes |
-| `issue_reimbursement` | Execute a financial action | High | Yes |
 
 ## Quick start
 
@@ -94,132 +89,90 @@ npm run check
 npm run dev
 ```
 
-The local demo intentionally runs in deterministic mock mode when no model credentials are present.
-
-### Optional Claude mode
-
-Create `.env` or export:
+Run the creator-commerce agent-management demo:
 
 ```bash
-export ANTHROPIC_API_KEY="..."
-export CLAUDE_MODEL="<model-id>"
-npm run dev
+npx tsx src/commerce/demo.ts
 ```
 
-The model ID is configuration rather than being hard-coded so the project can track model changes without source edits.
+It produces structured runs, evaluations, boundary events, and an improvement queue so the management loop can be inspected without external APIs.
 
-## Run the MCP server
+## Existing enterprise workflow demo
 
-```bash
-npm run mcp
-```
+The original reimbursement workflow remains as a second domain example. A finance user requests a reimbursement; the agent retrieves policy, checks permissions, stops at the approval boundary, and records the attempt rather than falsely claiming execution.
 
-The server uses stdio, making it inspectable with an MCP-compatible host or the MCP Inspector.
-
-```bash
-npx @modelcontextprotocol/inspector npm run mcp
-```
-
-> MCP protocol traffic owns stdout; server diagnostics are written to stderr.
+This demonstrates the same principle from another angle: **reliable agents should know when not to act.**
 
 ## Project structure
 
 ```text
 src/
 ├── agent/
-│   ├── orchestrator.ts      # Main agent lifecycle
-│   └── subagents.ts         # Policy + research sub-agent patterns
+│   ├── orchestrator.ts
+│   └── subagents.ts
+├── commerce/
+│   ├── agents.ts            # Creator-commerce specialist fleet
+│   ├── manager.ts           # Evaluator, triage, drift detection
+│   ├── demo.ts              # Inspectable gardening-loop demo
+│   └── types.ts             # Task, run, eval, improvement contracts
 ├── mcp/
-│   └── server.ts            # MCP stdio server
+│   └── server.ts
 ├── observability/
-│   └── audit.ts             # Audit event instrumentation
+│   └── audit.ts
 ├── policy/
-│   └── engine.ts            # Role/risk/approval policy engine
+│   └── engine.ts
 ├── skills/
-│   └── escalation.ts        # Reusable workflow skill
+│   └── escalation.ts
 ├── state/
-│   └── store.ts             # Stateful session memory
+│   └── store.ts
 ├── tools/
-│   ├── data.ts              # Mock enterprise data
-│   └── registry.ts          # Validated tool layer
+│   ├── data.ts
+│   └── registry.ts
 ├── demo.ts
 └── types.ts
 
 tests/
+├── commerce-manager.test.ts
 ├── policy.test.ts
 └── skills.test.ts
 
 docs/
+├── CREATOR_COMMERCE_CASE_STUDY.md
 ├── EVALS.md
 └── THREAT_MODEL.md
 ```
 
-## Safety model
-
-The agent operates under four rules:
-
-### 1. Least privilege
-
-Tool availability depends on the user's role. An employee should not gain HR-write access because a prompt asked nicely.
-
-### 2. Consequential writes require approval
-
-Financial and employee-record writes are separated from low-risk retrieval and drafting tools.
-
-### 3. Validate before execution
-
-Every tool call crosses a schema boundary before reaching its handler.
-
-### 4. Observe everything important
-
-The audit layer records requests, blocks, approval boundaries, and successful execution so agent behavior can be evaluated as a system.
-
-See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
-
 ## Evaluation strategy
 
-A production agent should be evaluated across more than answer quality. This repo proposes metrics for:
+A production agent should be evaluated as a system, not only on whether an answer sounds good. Relevant metrics include:
 
-- task completion
-- unauthorized-action rate
-- false-success rate
-- tool-call correctness
-- human-escalation precision
-- schema adherence
-- state isolation
-- latency and cost
+- task success rate
+- human acceptance / edit rate
+- evidence-grounding rate
+- boundary violation rate
+- escalation precision and recall
+- delegation success rate
+- tool failure rate
+- quality by prompt / agent version
+- repeated failure frequency
+- drift by workflow or customer segment
+- latency and cost per successful task
 
-See [`docs/EVALS.md`](docs/EVALS.md).
-
-## Production roadmap
-
-This reference implementation intentionally uses mock enterprise systems so it can be public. A production deployment would extend the same boundaries with:
-
-- Google Workspace delegated access
-- Slack and Jira connectors
-- Salesforce or CRM tools
-- Workday/HRIS access
-- Okta/OIDC authentication
-- AWS-hosted services
-- encrypted persistent state
-- secrets management
-- tamper-resistant logs
-- connector-specific scopes
-- prompt-injection defenses
-- red-team and regression eval suites
-- durable approval workflows
+The deterministic evaluator in `src/commerce/manager.ts` is intentionally inspectable. A production implementation could combine deterministic checks with calibrated LLM-as-judge evaluation and human review.
 
 ## Design principles
 
-**Workflow first.** Understand how people actually work before automating it.
+**Workflow first.** Understand how people actually work before deciding an agent belongs in the process.
 
-**Agents over chat wrappers.** The model is one component of a larger software system.
+**Own the need, not the novelty.** Each agent exists for a specific customer job and should be measured against it.
 
-**Reliability over maximum autonomy.** Autonomy should increase only when evidence supports it.
+**Evidence over vibes.** Real runs, failure patterns, evals, and acceptance data drive improvements.
 
-**Humans are part of the architecture.** Some actions should require judgment and explicit consent.
+**Route the real problem.** Not every failure is a prompt problem; capability gaps, product ambiguity, and human decisions need different owners.
 
-**Reusable capabilities beat one-off demos.** Skills and tools should raise the floor for future builders.
+**Reliability over maximum autonomy.** Expand autonomy only when evidence supports it.
+
+**Humans are part of the architecture.** Escalation is a product feature, not necessarily a failure.
 
 ## Tech
 
@@ -229,8 +182,8 @@ TypeScript · Node.js · Anthropic SDK · Model Context Protocol · Zod · Node 
 
 **Maurice Thomas**  
 Austin, Texas  
-Applied AI · Agentic Systems · Automation · Product Engineering
+Applied AI Product · Agentic Systems · LLM Evaluation · Creator Technology
 
 ---
 
-This repository contains mock data only and is designed as a public engineering demonstration. It does not connect to or represent BetterUp systems, data, or internal architecture.
+This repository uses mock data and fictional workflows for a public portfolio demonstration. It does not connect to or represent any employer's, client's, creator platform's, or brand's private systems, data, or internal architecture.
