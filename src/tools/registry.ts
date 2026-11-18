@@ -29,7 +29,7 @@ const rawTools: ToolDefinition[] = [
     schema: z.object({ query: z.string().min(1) }),
     async execute({ query }) {
       const terms = query.toLowerCase().split(/\s+/);
-      return { ok: true, data: docs.filter(d => terms.some(t => `${d.title} ${d.text}`.toLowerCase().includes(t))) };
+      return { ok: true, data: docs.filter(d => terms.some((t: string) => `${d.title} ${d.text}`.toLowerCase().includes(t))) };
     }
   },
   {
